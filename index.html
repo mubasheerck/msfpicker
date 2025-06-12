@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Symbols Categorized Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <div class="topbar">
+            <h1>Material Symbols Icon Picker</h1>
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-input"
+                    placeholder="Search icons by name or category...">
+            </div>
+        </div>
+        <div class="icon-list-container">
+            <div id="categories-container" class="categories-container">
+                <div class="loading">Please wait, loading icons...</div>
+            </div>
+            <div id="selection-panel" class="selection-panel">
+                <h3>Material Symbols Picker</h3>
+                <p>This is an experimental project, developed to improve web application performance while using material symbols either by CDN or Self-hosted. Names of selected icons are given below along with the Google Materials Symbols CDN Link. Just click on 'Copy Link' to get a customized CDN Link fr your selected icons.</p>
+                <div class="selected-count-container">Selected icons: <span id="selected-count" class="selected-count">0</span></div>
+                <div id="selected-icons" class="selected-icons"></div>
+                <div class="action-buttons">                    
+                        <button id="copy-btn" class="btn copy-btn" title="Copy Selected Icons"><span
+                                class="material-symbols">content_copy</span> Copy Icons</button>
+                        <button id="clear-btn" class="btn clear-btn"><span class="material-symbols"
+                                title="Clear Selection">clear_all</span> Clear</button>
+                        <button id="exportIcons" class="btn export-btn"><span
+                                class="material-symbols">file_export</span>
+                            Export Selection</button>                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="download.js"></script>
+
+    <script>
+        // Material Icons link
+        const exportPrefix = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,200,0..1,0&icon_names=';
+
+        // Keep track of selected icons
+        const selectedIcons = new Set();
+        // Store all icons and categories for searching
+        let allIcons = {};
+        let allCategories = {};
+
+        // Function to parse and organize icons by category
+        function organizeIconsByCategory(iconData) {
+            const categories = {};
+
+            Object.keys(iconData).forEach(key => {
+                const parts = key.split("::");
+                if (parts.length === 2) {
+                    const category = parts[0];
+                    const iconName = parts[1];
+
+                    if (!categories[category]) {
+                        categories[category] = [];
+                    }
+
+                    categories[category].push(iconName);
+
+                    // Store for search functionality
+                    allIcons[iconName] = category;
+                    if (!allCategories[category]) {
+                        allCategories[category] = [];
+                    }
+                    allCategories[category].push(iconName);
+                }
+            });
+
+            return categories;
+        }
+
+        // Function to toggle icon selection
+        function toggleIconSelection(iconName, element) {
+            const selectedIconsContainer = document.getElementById('selected-icons');
+            selectedIconsContainer.textContent = exportPrefix;
+
+            if (selectedIcons.has(iconName)) {
+                selectedIcons.delete(iconName);
+                element.classList.remove('selected');
+            } else {
+                selectedIcons.add(iconName);
+                element.classList.add('selected');
+            }
+
+            updateSelectionPanel();
+        }
+
+        // Function to update the selection panel
+        function updateSelectionPanel() {
+            const selectionPanel = document.getElementById('selection-panel');
+            const selectedCount = document.getElementById('selected-count');
+            const selectedIconsContainer = document.getElementById('selected-icons');
+
+            selectedCount.textContent = selectedIcons.size;            
+
+            if (selectedIcons.size > 0) {
+                selectionPanel.classList.add('active');
+                selectedIconsContainer.textContent = exportPrefix + Array.from(selectedIcons).join(',');
+            } else {
+                selectionPanel.classList.remove('active');
+                selectedIconsContainer.textContent = '';
+            }
+        }
+
+        // Function to copy selected icons to clipboard
+        function copySelectedIcons() {
+            
+            const sortedIcons = Array.from(selectedIcons).sort();
+            // Convert array to comma-separated string
+            const iconNames = sortedIcons.join(',');
+
+            const exportLink = exportPrefix + iconNames;
+            
+            navigator.clipboard.writeText(exportLink)
+                .then(() => {
+                    showToast('Icons copied to clipboard!', 'success');
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    showToast('Failed to copy. Try using the selection text directly', 'error');
+                });
+        }
+
+        // Function to clear all selections
+        function clearSelection() {
+            selectedIcons.clear();
+
+            // Remove selected class from all icon containers
+            document.querySelectorAll('.icon-container.selected').forEach(container => {
+                container.classList.remove('selected');
+            });
+
+            updateSelectionPanel();
+        }
+
+        // Function to filter icons based on search input
+        function filterIcons(searchTerm) {
+            searchTerm = searchTerm.toLowerCase().trim();
+            const categoryContainers = document.querySelectorAll('.category-section');
+            let visibleCategories = 0;
+            let visibleIcons = 0;
+
+            categoryContainers.forEach(categoryContainer => {
+                const categoryTitle = categoryContainer.querySelector('.category-title');
+                const category = categoryTitle.textContent.toLowerCase();
+                const iconContainers = categoryContainer.querySelectorAll('.icon-container');
+
+                let hasVisibleIcons = false;
+
+                if (searchTerm === '' || category.includes(searchTerm)) {
+                    // Show all icons in this category
+                    iconContainers.forEach(container => {
+                        container.classList.remove('hide');
+                        visibleIcons++;
+                    });
+                    hasVisibleIcons = iconContainers.length > 0;
+                } else {
+                    // Filter icons by name
+                    iconContainers.forEach(container => {
+                        const iconName = container.querySelector('.icon-name').textContent.toLowerCase();
+                        if (iconName.includes(searchTerm)) {
+                            container.classList.remove('hide');
+                            hasVisibleIcons = true;
+                            visibleIcons++;
+                        } else {
+                            container.classList.add('hide');
+                        }
+                    });
+                }
+
+                // Show/hide category based on if it has visible icons
+                if (hasVisibleIcons) {
+                    categoryContainer.classList.remove('hide');
+                    visibleCategories++;
+                } else {
+                    categoryContainer.classList.add('hide');
+                }
+            });
+
+            // Show no results message if needed
+            const noResultsMessage = document.getElementById('no-results-message');
+            if (visibleIcons === 0 && searchTerm !== '') {
+                if (!noResultsMessage) {
+                    const message = document.createElement('div');
+                    message.id = 'no-results-message';
+                    message.className = 'no-results';
+                    message.textContent = 'No icons match your search.';
+                    document.getElementById('categories-container').appendChild(message);
+                }
+            } else if (noResultsMessage) {
+                noResultsMessage.remove();
+            }
+        }
+
+        // Function to render the icon categories
+        function renderCategories(categorizedIcons) {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = ''; // Clear loading message
+
+            // Create sections for each category
+            Object.keys(categorizedIcons).forEach(category => {
+                // Create category section
+                const categorySection = document.createElement('div');
+                categorySection.className = 'category-section';
+
+                // Add category title
+                const categoryTitle = document.createElement('div');
+                categoryTitle.className = 'category-title';
+                categoryTitle.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                categorySection.appendChild(categoryTitle);
+
+                // Add icons for this category
+                const iconsContainer = document.createElement('div');
+                iconsContainer.className = 'icons-container';
+
+                categorizedIcons[category].forEach(iconName => {
+                    const iconContainer = document.createElement('div');
+                    iconContainer.className = 'icon-container';
+                    if (selectedIcons.has(iconName)) {
+                        iconContainer.classList.add('selected');
+                    }
+
+                    const iconElem = document.createElement('span');
+                    iconElem.className = 'material-symbols';
+                    iconElem.textContent = iconName;
+
+                    const nameElem = document.createElement('div');
+                    nameElem.className = 'icon-name';
+                    nameElem.textContent = iconName;
+
+                    iconContainer.appendChild(iconElem);
+                    iconContainer.appendChild(nameElem);
+                    iconContainer.addEventListener('click', () => toggleIconSelection(iconName, iconContainer));
+                    iconsContainer.appendChild(iconContainer);
+                });
+
+                categorySection.appendChild(iconsContainer);
+                container.appendChild(categorySection);
+            });
+        }
+
+        // Load JSON from URL
+        async function loadIconsFromUrl(url) {
+            try {
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const iconData = await response.json();
+                const categorizedIcons = organizeIconsByCategory(iconData);
+                renderCategories(categorizedIcons);
+
+                // Set up search after icons are loaded
+                setupSearch();
+            } catch (error) {
+                console.error('Error loading the icon data:', error);
+                const container = document.getElementById('categories-container');
+                container.innerHTML = `<div class="error">Error loading icons: ${error.message}</div>`;
+            }
+        }
+
+        // Set up search functionality
+        function setupSearch() {
+            const searchInput = document.getElementById('search-input');
+
+            searchInput.addEventListener('input', function () {
+                filterIcons(this.value);
+            });
+
+            // Add clear button functionality to search
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    filterIcons('');
+                }
+            });
+        }
+
+        // Function to export selected icons in alphabetical order
+        function exportSelectedIcons() {
+            // Convert Set to Array, sort alphabetically            
+
+            const sortedIcons = Array.from(selectedIcons).sort();
+
+            // Convert array to comma-separated string
+            const iconString = sortedIcons.join(',');
+
+            // Log to console            
+            showToast('Exported Icons', 'success');
+            const iconStylesheet = exportPrefix + iconString;
+
+            // Example usage with fetch:
+            fetch(iconStylesheet)
+                .then(response => processStylesheetResponse(response))
+                .then(result => {
+                    showToast('Process completed successfully!', 'success');
+                })
+                .catch(error => {
+                    showToast(`Error in the process: ${error.message}`, 'error');
+                });
+
+        }
+
+        // Set up event listeners for buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            // Replace with your actual JSON file URL
+            const jsonUrl = 'https://raw.githubusercontent.com/google/material-design-icons/refs/heads/master/update/current_versions.json';
+
+            // Load icons
+            loadIconsFromUrl(jsonUrl);
+
+            // Set up copy button
+            document.getElementById('copy-btn').addEventListener('click', copySelectedIcons);
+
+            // Set up clear button
+            document.getElementById('clear-btn').addEventListener('click', clearSelection);
+
+            // Set up export button
+            document.getElementById('exportIcons').addEventListener('click', exportSelectedIcons);
+        });
+    </script>
+</body>
+
+</html>
